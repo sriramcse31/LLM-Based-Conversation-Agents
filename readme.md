@@ -1,12 +1,12 @@
-# AI Agent Conversation & Debate System
+# AI Agent Conversation System
 
-Two AI agents that communicate through spoken conversation. Supports both casual conversation mode and structured debate mode with a web interface.
+Two AI agents that communicate through spoken conversation with text syncing in real-time.
 
 ## What you need
 
 - Windows
 - Python 3.8 or newer
-- Ollama with gemma2:2b model (or gemma3:1b)
+- Ollama with gemma2:2b model
 
 ## Setup
 
@@ -22,136 +22,144 @@ Install Python packages:
 pip install -r requirements.txt
 ```
 
-## Mode 1: Casual Conversation (Terminal)
-
-Run the conversation mode:
+## Running the System
 
 ```bash
 python agent_conversation.py
 ```
 
-You'll get a menu to pick topics, conversation length, and voices.
+You'll get an interactive menu to:
+- Choose a conversation topic (or enter your own)
+- Set the number of conversation turns
+- Select voice pairs for the agents
 
-## Mode 2: Debate Arena (Web Interface)
+### Conversation Structure
+- Agents stay on topic with periodic guidance prompts
+- Conversations progress through different angles (challenges, future evolution, practical actions)
+- Sanitized conversation history prevents pattern reinforcement
 
-Run the web server:
+**Note:** Small models (2-3B parameters) struggle to consistently follow these rules despite heavy prompting.
 
-```bash
-python debate_web_app.py
-```
+## Agent Roles
 
-Then open your browser to:
-```
-http://localhost:5000
-```
+**Agent 1 - Technical Analyst**
+- Provides concise, technical responses
+- Focuses on specific tools, frameworks, and implementation details
+- Analytical and precise
 
-### Debate Features
+**Agent 2 - Strategic Critic**
+- Challenges assumptions and identifies limitations
+- Asks probing questions about business impact and risks
+- Direct and questioning
 
-- **Structured Format**: Opening → Arguments → Rebuttals → Closing
-- **Clear Sides**: One agent argues FOR, one argues AGAINST
-- **Visual Interface**: See who's speaking with highlighted cards
-- **Synced Text**: Text types in real-time as the voice speaks
-- **Full Transcript**: Complete debate log at the bottom
+## Customization
 
-### Using the Web Interface
+### Change the Model
 
-1. Enter your debate topic (e.g., "AI will replace human jobs")
-2. Click "Start Debate"
-3. Click "Next Turn" to progress through the debate
-4. Watch as agents take turns with synced text and audio
-5. Scroll down to see the full transcript
-
-## File Structure
-
-```
-ai-agents/
-├── agent_conversation.py    # Casual conversation mode
-├── debate_web_app.py        # Web debate mode (Flask server)
-├── requirements.txt         # Dependencies
-├── README.md               # This file
-├── templates/              # Created automatically
-│   └── debate.html        # Web interface
-└── static/                # Created automatically
-    └── audio_*.mp3        # Temporary audio files
-```
-
-## Setup Files
-
-After first run, save the HTML template:
-
-Create `templates/debate.html` and paste the HTML content from the artifacts.
-
-## Customizing
-
-### Change Debate Agents
-
-Edit `debate_web_app.py`:
-
+Edit `agent_conversation.py`:
 ```python
-agent_for = DebateAgent(
+response = ollama.generate(
+    model='gemma3:1b',  # or 'llama3.2:3b', 'mistral:7b', etc.
+```
+
+### Adjust Response Length
+
+Change `num_predict` in the `think()` method:
+```python
+'num_predict': 100,  # Lower = shorter, Higher = longer
+```
+
+### Modify Agent Personalities
+
+Edit the agent creation in `main()`:
+```python
+agent1 = Agent(
     name="Alex",
-    stance="FOR",
-    role="Your custom role description",
+    personality="Your custom personality here...",
     voice="en-US-GuyNeural"
 )
 ```
 
-### Adjust Debate Structure
+### Change Speech Rate
 
-Modify the phases in `DebateManager.__init__`:
-
+In the `speak()` method:
 ```python
-self.debate_structure = [
-    ("opening", "Opening Statement", 2),  # 2 turns
-    ("argument", "Main Arguments", 4),    # 4 turns
-    ("rebuttal", "Rebuttals", 2),        # 2 turns
-    ("closing", "Closing Statement", 2)   # 2 turns
-]
-```
-
-### Change Model
-
-Both scripts use the model specified in the code. To change:
-
-```python
-model='gemma2:2b'  # or 'gemma3:1b', 'llama3.2:3b', etc.
+communicate = edge_tts.Communicate(text, self.voice, rate="+15%")
+# Increase: "+25%", "+30%" (faster)
+# Decrease: "+5%", "+0%" (slower)
 ```
 
 ## Troubleshooting
 
-**Flask not found**
+### Ollama Issues
+
+**Problem:** Connection refused or model not found
 ```bash
-pip install flask flask-cors
-```
-
-**Port already in use**
-Change the port in `debate_web_app.py`:
-```python
-app.run(debug=True, port=5001)  # Use different port
-```
-
-**Audio not playing in browser**
-- Check browser console for errors
-- Make sure the `static` folder exists
-- Try a different browser (Chrome/Edge recommended)
-
-**Text not syncing with audio**
-- This can happen if audio loads slowly
-- The typing speed is calculated based on audio duration
-- Refresh the page and try again
-
-**Ollama connection issues**
-Make sure Ollama is running:
-```bash
+# Start Ollama
 ollama serve
+
+# Verify model is installed
+ollama list
+ollama pull gemma2:2b
 ```
 
-## Available Voices
+### Module Not Found
 
-- Guy, Christopher, Eric (American male)
-- Jenny, Aria, Sara (American female)
-- Ryan, Sonia (British)
+```bash
+pip install -r requirements.txt
+```
 
-Run `edge-tts --list-voices` to see all options.
+## Known Limitations
 
-That's it! Choose conversation mode for casual chat or debate mode for structured arguments.
+### Model Instruction Following
+Small models (1-3B parameters) have difficulty consistently following complex rules:
+- Filler words still appear despite explicit bans
+- Agents may mirror each other's speaking patterns
+- Conversations can become repetitive or circular
+
+**This is a fundamental limitation of small language models, not a bug.**
+
+For better results, use larger models (7B+) if your hardware supports it.
+
+### Text Syncing Accuracy
+Text typing speed is calculated based on audio duration. Slight desyncs may occur if:
+- Audio loads slowly
+- System is under heavy load
+- TTS generation varies in speed
+
+## Project Structure
+
+```
+ai-agents/
+├── agent_conversation.py    # Main application
+├── requirements.txt         # Dependencies
+├── README.md               # This file
+└── temp_*.mp3              # Temporary audio files (auto-deleted)
+```
+
+## How It Works
+
+1. **Agent thinks:** Generates response using local LLM (Ollama)
+2. **Text-to-Speech:** Converts response to audio using Edge TTS
+3. **Synced Display:** Calculates typing speed based on audio duration
+4. **Simultaneous Play:** Plays audio while typing text character-by-character
+5. **History Sanitization:** Cleans filler words before storing in conversation history
+6. **Turn Management:** Alternates speakers with topic guidance at key turns
+
+## Example Topics
+
+Technical:
+- "Impact of AI on software QA engineers"
+- "Microservices vs monolithic architecture trade-offs"
+- "Security challenges in IoT devices"
+
+General:
+- "Should humanity colonize Mars?"
+- "Impact of social media on society"
+- "Future of remote work"
+
+The system works best with topics that have clear pro/con arguments or multiple perspectives.
+
+---
+
+**Note:** This is an experimental system showcasing AI agent interaction. Conversation quality depends heavily on the underlying language model's capabilities.

@@ -9,6 +9,9 @@ from typing import List, Dict
 class Agent:
     """An AI agent that can speak and listen"""
     
+    # Class-level event loop for Windows compatibility
+    _event_loop = None
+    
     def __init__(self, name: str, personality: str, voice: str = "en-US-GuyNeural"):
         self.name = name
         self.personality = personality
@@ -20,6 +23,12 @@ class Agent:
         # Initialize pygame mixer for audio playback
         if not pygame.mixer.get_init():
             pygame.mixer.init()
+        
+        # Initialize event loop once for all agents
+        if Agent._event_loop is None:
+            import asyncio
+            Agent._event_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(Agent._event_loop)
         
     def speak(self, text: str):
         """Convert text to speech and play it with synced text display"""
@@ -35,16 +44,8 @@ class Agent:
             audio_file = f"temp_{self.name}.mp3"
             communicate = edge_tts.Communicate(text, self.voice, rate="+15%")
             
-            # Fix for Windows event loop error
-            import asyncio
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_closed():
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                loop.run_until_complete(communicate.save(audio_file))
-            except RuntimeError:
-                asyncio.run(communicate.save(audio_file))
+            # Use the class-level event loop to avoid Windows errors
+            Agent._event_loop.run_until_complete(communicate.save(audio_file))
             
             # Get audio duration for sync calculation
             from mutagen.mp3 import MP3
@@ -68,7 +69,6 @@ class Agent:
                 print(char, end='', flush=True)
                 time.sleep(char_delay)
             
-
             print()  # New line after text completes
             
             # Wait for audio to finish (if any remaining)
@@ -86,9 +86,8 @@ class Agent:
                 
         except Exception as e:
             # Fallback: just print the text if audio fails
-            pass
-            #print(text)
-            #print(f"⚠️ Speech error: {e}")
+            print(text)
+            print(f"⚠️ Speech error: {e}")
     
     def think(self, prompt: str) -> str:
         """Generate a response using the local Gemma model"""
@@ -103,8 +102,7 @@ class Agent:
         
         context += f"\nNow respond to: {prompt}\n"
         context += f"IMPORTANT: Respond conversationally as if talking to a friend. Keep your response to 2-3 sentences maximum. Use natural spoken language - contractions, casual phrases, and a relaxed tone. Share your thoughts briefly. No asterisks, actions, or tone descriptions.\n{self.name}:"
-        context += f"Do not use words from the list : okay so, ok so, honestly, seriously, kinda, somewhat,literally, pretty good|bad|important, really, actually, you know, right, isn't it, don't you think,I think, probably"
-
+        
         # Call Ollama
         response = ollama.generate(
             model='gemma3:1b',

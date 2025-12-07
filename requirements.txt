@@ -1,0 +1,6 @@
+ollama
+edge-tts
+pygame
+flask
+flask-cors
+mutagen
